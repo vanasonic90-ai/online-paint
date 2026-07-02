@@ -194,7 +194,7 @@
             }
         }
 
-        clearBtn.addEventListener('click', () => { if (socket) socket.emit('clear_canvas'); });
+        clearBtn.addEventListener('click', () => { if (window.socket) window.socket.emit('clear_canvas'); });
     </script>
 </body>
 </html>
