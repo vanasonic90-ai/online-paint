@@ -16,21 +16,13 @@
         button { padding: 8px 16px; font-size: 14px; cursor: pointer; border: none; border-radius: 20px; background-color: #dc3545; color: white; font-weight: bold; transition: background 0.2s, transform 0.1s; }
         button:hover { background-color: #bd2130; }
         
-        /* Всплывающая подсказка с именем автора */
         #author-tag {
-            position: fixed;
-            padding: 5px 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border-radius: 5px;
-            font-size: 12px;
-            pointer-events: none;
-            display: none;
-            z-index: 100;
-            font-weight: bold;
+            position: fixed; padding: 5px 10px; background: rgba(0, 0, 0, 0.8); color: white; border-radius: 5px;
+            font-size: 12px; pointer-events: none; display: none; z-index: 100; font-weight: bold;
         }
     </style>
-    <script src="https://socket.io"></script>
+    <!-- Самая стабильная ссылка на библиотеку мультиплеера -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
@@ -53,15 +45,14 @@
     <canvas id="paintCanvas"></canvas>
 
     <script>
-        // Спрашиваем имя при входе
+        // Запрос никнейма при входе
         let userName = prompt("Введите ваш никнейм для рисования:", "Художник") || "Аноним";
         document.getElementById('user-display').innerText = "Вы: " + userName;
 
-        // Пока оставляем локальный адрес, при деплое поменяем
-        const socket = io('https://onrender.com');
-
-
-
+        // Круглосуточное безопасное подключение к серверу сокетов
+        const socket = io('https://onrender.com', {
+            transports: ['websocket']
+        });
 
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d');
@@ -72,40 +63,28 @@
 
         let isDrawing = false;
         let lastX = 0; let lastY = 0;
-        
-        // Массив, где мы будем хранить координаты всех линий и имена авторов
         let linesMemory = [];
 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        let lastWidth = window.innerWidth;
-        function resizeCanvas() {
-    // Проверяем, действительно ли сильно изменился размер (защита от багов браузера)
-            if (Math.abs(window.innerWidth - lastWidth) > 20) {
-                lastWidth = window.innerWidth;
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                socket.emit('request_canvas_state');
-            }
-        }
-
-        window.addEventListener('resize', resizeCanvas);
+        // Статичный размер холста при запуске
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Базовое восстановление холста
+        // Получение истории доски от сервера
         socket.on('canvas_state', (history) => {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (history && Array.isArray(history)) {
                 linesMemory = history;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 linesMemory.forEach(line => drawSegment(line));
             }
         });
 
+        // Получение линий от друзей
         socket.on('draw_line', (data) => {
             linesMemory.push(data);
             drawSegment(data);
@@ -127,10 +106,9 @@
             ctx.closePath();
         }
 
-        // Логика рисования мышкой/пальцем
         function getCoords(e) {
             if (e.touches && e.touches.length > 0) {
-                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                return { x: e.touches.clientX, y: e.touches.clientY };
             }
             return { x: e.clientX, y: e.clientY };
         }
@@ -143,8 +121,6 @@
 
         function draw(e) {
             const coords = getCoords(e);
-            
-            // Логика проверки: КТО нарисовал эту точку (наведение мышки)
             checkAuthor(coords.x, coords.y);
 
             if (!isDrawing) return;
@@ -155,7 +131,7 @@
                 x1: coords.x, y1: coords.y,
                 color: colorPicker.value,
                 size: lineWidthInput.value,
-                author: userName // Отправляем ваше имя вместе с линией
+                author: userName
             };
 
             linesMemory.push(drawData);
@@ -172,13 +148,13 @@
             }
         }
 
-        // Функция проверки автора под курсором
         function checkAuthor(mx, my) {
-            // Ищем, попал ли курсор на какую-то линию (с небольшой погрешностью)
+            if (linesMemory.length === 0) return;
+            
             let foundLine = linesMemory.find(line => {
                 const distance = Math.abs((line.y1 - line.y0) * mx - (line.x1 - line.x0) * my + line.x1 * line.y0 - line.y1 * line.x0) / 
                                  Math.sqrt(Math.pow(line.y1 - line.y0, 2) + Math.pow(line.x1 - line.x0, 2));
-                return distance < (parseInt(line.size) / 2 + 3) && 
+                return distance < (parseInt(line.size) / 2 + 5) && 
                        mx >= Math.min(line.x0, line.x1) - 5 && mx <= Math.max(line.x0, line.x1) + 5 &&
                        my >= Math.min(line.y0, line.y1) - 5 && my <= Math.max(line.y0, line.y1) + 5;
             });
