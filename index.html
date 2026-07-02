@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>paint-online</title>
+    <title>Общая Онлайн Рисовалка</title>
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #fff; font-family: Arial, sans-serif; }
@@ -13,6 +13,7 @@
         .tool-group { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #333; font-weight: bold; }
         input[type="color"] { border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; background: none; }
         input[type="range"] { cursor: pointer; width: 100px; }
+        #nickInput { border: 1px solid #ccc; border-radius: 10px; padding: 4px 8px; width: 100px; font-size: 13px; font-weight: bold; color: #007bff; }
         button { padding: 8px 16px; font-size: 14px; cursor: pointer; border: none; border-radius: 20px; background-color: #dc3545; color: white; font-weight: bold; transition: background 0.2s, transform 0.1s; }
         button:hover { background-color: #bd2130; }
         
@@ -21,14 +22,15 @@
             font-size: 12px; pointer-events: none; display: none; z-index: 100; font-weight: bold;
         }
     </style>
-    <!-- Самая стабильная ссылка на библиотеку мультиплеера -->
+    <!-- Подключаем библиотеку сокетов -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
     <div id="toolbar">
         <div class="tool-group">
-            <span id="user-display" style="color: #007bff;">Вы: Гость</span>
+            <label for="nickInput">Ваш ник:</label>
+            <input type="text" id="nickInput" value="">
         </div>
         <div class="tool-group">
             <label for="colorPicker">Цвет</label>
@@ -45,11 +47,11 @@
     <canvas id="paintCanvas"></canvas>
 
     <script>
-        // Запрос никнейма при входе
-        let userName = prompt("Введите ваш никнейм для рисования:", "Художник") || "Аноним";
-        document.getElementById('user-display').innerText = "Вы: " + userName;
+        // Генерируем случайный никнейм без всплывающих окон
+        const nickInput = document.getElementById('nickInput');
+        nickInput.value = "User_" + Math.floor(Math.random() * 900 + 100);
 
-        // Круглосуточное безопасное подключение к серверу сокетов
+        // Безопасное подключение к серверу сокетов
         const socket = io('https://onrender.com', {
             transports: ['websocket']
         });
@@ -68,13 +70,11 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Статичный размер холста при запуске
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Получение истории доски от сервера
         socket.on('canvas_state', (history) => {
             if (history && Array.isArray(history)) {
                 linesMemory = history;
@@ -84,7 +84,6 @@
             }
         });
 
-        // Получение линий от друзей
         socket.on('draw_line', (data) => {
             linesMemory.push(data);
             drawSegment(data);
@@ -131,7 +130,7 @@
                 x1: coords.x, y1: coords.y,
                 color: colorPicker.value,
                 size: lineWidthInput.value,
-                author: userName
+                author: nickInput.value // Никнейм берется прямо из текстового поля панели
             };
 
             linesMemory.push(drawData);
