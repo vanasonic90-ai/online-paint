@@ -22,7 +22,7 @@ let canvasHistory = [];
 io.on('connection', (socket) => {
     console.log('Пользователь подключился:', socket.id);
     
-    // Сразу передаем всю историю новому участнику
+    // Сразу передаем всю историю нового участнику
     socket.emit('canvas_state', canvasHistory);
 
     socket.on('draw_line', (data) => {
