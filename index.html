@@ -58,7 +58,8 @@
         document.getElementById('user-display').innerText = "Вы: " + userName;
 
         // Пока оставляем локальный адрес, при деплое поменяем
-        const socket = io('http://localhost:3000');
+        const socket = io('https://onrender.com');
+
 
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d');
