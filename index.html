@@ -46,40 +46,45 @@
     <canvas id="paintCanvas"></canvas>
 
     <script>
-        const nickInput = document.getElementById('nickInput');
-        nickInput.value = "User_" + Math.floor(Math.random() * 900 + 100);
+       // Динамическое подключение сокетов, которое обойдет любые опечатки вверху страницы
+if (typeof io === 'undefined') {
+    var script = document.createElement('script');
+    script.src = 'https://cloudflare.com';
+    script.onload = function() {
+        initSocket();
+    };
+    document.head.appendChild(script);
+} else {
+    initSocket();
+}
 
-        const socket = io('https://onrender.com', {
-            transports: ['websocket']
-        });
+function initSocket() {
+    window.socket = io('https://onrender.com', {
+        transports: ['websocket']
+    });
+    
+    // Перепривязываем слушатели сервера к новому сокету
+    window.socket.on('canvas_state', (history) => {
+        if (history && Array.isArray(history)) {
+            linesMemory = history;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            linesMemory.forEach(line => drawSegment(line));
+        }
+    });
 
-        const canvas = document.getElementById('paintCanvas');
-        const ctx = canvas.getContext('2d');
-        const colorPicker = document.getElementById('colorPicker');
-        const lineWidthInput = document.getElementById('lineWidth');
-        const clearBtn = document.getElementById('clearBtn');
-        const authorTag = document.getElementById('author-tag');
+    window.socket.on('draw_line', (data) => {
+        linesMemory.push(data);
+        drawSegment(data);
+    });
 
-        let isDrawing = false;
-        let lastX = 0; let lastY = 0;
-        let linesMemory = [];
-
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+    window.socket.on('clear_canvas', () => {
+        linesMemory = [];
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+}
 
-        socket.on('canvas_state', (history) => {
-            if (history && Array.isArray(history)) {
-                linesMemory = history;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                linesMemory.forEach(line => drawSegment(line));
-            }
-        });
 
         socket.on('draw_line', (data) => {
             linesMemory.push(data);
@@ -132,7 +137,7 @@
 
             linesMemory.push(drawData);
             drawSegment(drawData);
-            socket.emit('draw_line', drawData);
+            window.socket.emit('draw_line', drawData);
 
             [lastX, lastY] = [coords.x, coords.y];
         }
@@ -140,7 +145,7 @@
         function stopDrawing() {
             if (isDrawing) {
                 isDrawing = false;
-                socket.emit('save_canvas', linesMemory);
+                window.socket.emit('save_canvas', linesMemory);
             }
         }
 
@@ -174,7 +179,7 @@
         canvas.addEventListener('touchmove', draw);
         canvas.addEventListener('touchend', stopDrawing);
 
-        clearBtn.addEventListener('click', () => { socket.emit('clear_canvas'); });
+        clearBtn.addEventListener('click', () => { window.socket.emit('clear_canvas'); });
     </script>
 </body>
 </html>
