@@ -53,7 +53,6 @@
         let isDrawing = false;
         let lastX = 0; let lastY = 0;
         let linesMemory = [];
-        let socket = null;
 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -64,9 +63,10 @@
 
         // Жёстко подключаем скрипт сокетов, защищая от автопереводчиков браузера
         const s = document.createElement('script');
-        s.src = "https://cloudflare.com";
+        s.src = "https://socket.io";
         s.onload = () => {
             if (typeof io !== 'undefined') {
+                // ВНИМАНИЕ: Вставьте ссылку на ваш проект Render вместо адреса ниже!
                 window.socket = io('https://onrender.com', { transports: ['websocket'] });
                 setupSocketListeners();
             }
@@ -74,7 +74,7 @@
         document.head.appendChild(s);
 
         function setupSocketListeners() {
-            socket.on('canvas_state', (history) => {
+            window.socket.on('canvas_state', (history) => {
                 if (history && Array.isArray(history)) {
                     linesMemory = history;
                     ctx.fillStyle = '#ffffff';
@@ -83,12 +83,12 @@
                 }
             });
 
-            socket.on('draw_line', (data) => {
+            window.socket.on('draw_line', (data) => {
                 linesMemory.push(data);
                 drawSegment(data);
             });
 
-            socket.on('clear_canvas', () => {
+            window.socket.on('clear_canvas', () => {
                 linesMemory = [];
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -133,7 +133,7 @@
 
             linesMemory.push(drawData);
             drawSegment(drawData);
-            if (socket) socket.emit('draw_line', drawData);
+            if (window.socket) window.socket.emit('draw_line', drawData);
 
             [lastX, lastY] = [coords.x, coords.y];
         });
@@ -141,7 +141,7 @@
         canvas.addEventListener('mouseup', () => {
             if (isDrawing) {
                 isDrawing = false;
-                if (socket) socket.emit('save_canvas', linesMemory);
+                if (window.socket) window.socket.emit('save_canvas', linesMemory);
             }
         });
         canvas.addEventListener('mouseout', () => { isDrawing = false; authorTag.style.display = 'none'; });
@@ -164,13 +164,13 @@
             };
             linesMemory.push(drawData);
             drawSegment(drawData);
-            if (socket) socket.emit('draw_line', drawData);
+            if (window.socket) window.socket.emit('draw_line', drawData);
             [lastX, lastY] = [coords.x, coords.y];
         });
         canvas.addEventListener('touchend', () => {
             if (isDrawing) {
                 isDrawing = false;
-                if (socket) socket.emit('save_canvas', linesMemory);
+                if (window.socket) window.socket.emit('save_canvas', linesMemory);
             }
         });
 
