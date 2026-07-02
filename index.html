@@ -67,7 +67,7 @@
         s.src = "https://cloudflare.com";
         s.onload = () => {
             if (typeof io !== 'undefined') {
-                socket = io('https://onrender.com', { transports: ['websocket'] });
+                window.socket = io('https://onrender.com', { transports: ['websocket'] });
                 setupSocketListeners();
             }
         };
