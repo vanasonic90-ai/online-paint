@@ -79,13 +79,19 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
+        let lastWidth = window.innerWidth;
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            socket.emit('request_canvas_state');
+    // Проверяем, действительно ли сильно изменился размер (защита от багов браузера)
+            if (Math.abs(window.innerWidth - lastWidth) > 20) {
+                lastWidth = window.innerWidth;
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                socket.emit('request_canvas_state');
+            }
         }
+
         window.addEventListener('resize', resizeCanvas);
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
