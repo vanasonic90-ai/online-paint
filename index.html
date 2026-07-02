@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -8,13 +9,20 @@
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #fff; font-family: Arial, sans-serif; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; cursor: crosshair; z-index: 1; }
-        #toolbar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); padding: 10px 20px; border-radius: 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; gap: 20px; align-items: center; z-index: 10; user-select: none; }
+        #toolbar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); padding: 10px 20px; border-radius: 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; gap: 15px; align-items: center; z-index: 10; user-select: none; }
         .tool-group { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #333; font-weight: bold; }
         input[type="color"] { border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; background: none; }
-        input[type="range"] { cursor: pointer; width: 100px; }
-        #nickInput { border: 1px solid #ccc; border-radius: 10px; padding: 4px 8px; width: 100px; font-size: 13px; font-weight: bold; color: #007bff; }
-        button { padding: 8px 16px; font-size: 14px; cursor: pointer; border: none; border-radius: 20px; background-color: #dc3545; color: white; font-weight: bold; transition: background 0.2s, transform 0.1s; }
-        button:hover { background-color: #bd2130; }
+        input[type="range"] { cursor: pointer; width: 80px; }
+        #nickInput { border: 1px solid #ccc; border-radius: 10px; padding: 4px 8px; width: 90px; font-size: 13px; font-weight: bold; color: #007bff; }
+        
+        button { padding: 8px 14px; font-size: 13px; cursor: pointer; border: none; border-radius: 20px; font-weight: bold; transition: all 0.2s; }
+        .btn-mode { background-color: #e2e8f0; color: #333; }
+        .btn-mode.active { background-color: #007bff; color: white; }
+        #clearLocalBtn { background-color: #ffc107; color: #212529; }
+        #clearLocalBtn:hover { background-color: #e0a800; }
+        #clearBtn { background-color: #dc3545; color: white; }
+        #clearBtn:hover { background-color: #bd2130; }
+        
         #author-tag { position: fixed; padding: 5px 10px; background: rgba(0, 0, 0, 0.8); color: white; border-radius: 5px; font-size: 12px; pointer-events: none; display: none; z-index: 100; font-weight: bold; }
     </style>
 </head>
@@ -22,23 +30,27 @@
 
     <div id="toolbar">
         <div class="tool-group">
-            <label for="nickInput">Ваш ник:</label>
+            <label for="nickInput">Ник:</label>
             <input type="text" id="nickInput" value="">
         </div>
         <div class="tool-group">
+            <button id="brushModeBtn" class="btn-mode active">Кисть</button>
+            <button id="eraserModeBtn" class="btn-mode">Ластик</button>
+        </div>
+        <div class="tool-group" id="colorGroup">
             <label for="colorPicker">Цвет</label>
             <input type="color" id="colorPicker" value="#000000">
         </div>
         <div class="tool-group">
             <label for="lineWidth">Толщина</label>
-            <input type="range" id="lineWidth" min="1" max="30" value="5">
+            <input type="range" id="lineWidth" min="1" max="50" value="5">
         </div>
-        <button id="clearBtn">Очистить ВСЁ</button>
+        <button id="clearLocalBtn">Стереть у себя</button>
+        <button id="clearBtn">Очистить у ВСЕХ</button>
     </div>
 
     <div id="author-tag">Рисовал: Кто-то</div>
     <canvas id="paintCanvas"></canvas>
-
     <script>
         const nickInput = document.getElementById('nickInput');
         nickInput.value = "User_" + Math.floor(Math.random() * 900 + 100);
@@ -48,9 +60,15 @@
         const colorPicker = document.getElementById('colorPicker');
         const lineWidthInput = document.getElementById('lineWidth');
         const clearBtn = document.getElementById('clearBtn');
+        const clearLocalBtn = document.getElementById('clearLocalBtn');
         const authorTag = document.getElementById('author-tag');
+        
+        const brushModeBtn = document.getElementById('brushModeBtn');
+        const eraserModeBtn = document.getElementById('eraserModeBtn');
+        const colorGroup = document.getElementById('colorGroup');
 
         let isDrawing = false;
+        let currentMode = 'brush'; 
         let lastX = 0; let lastY = 0;
         let linesMemory = [];
 
@@ -61,12 +79,11 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Жёстко подключаем скрипт сокетов, защищая от автопереводчиков браузера
         const s = document.createElement('script');
         s.src = "https://socket.io";
         s.onload = () => {
             if (typeof io !== 'undefined') {
-                // ВНИМАНИЕ: Вставьте ссылку на ваш проект Render вместо адреса ниже!
+                // ВНИМАНИЕ: Замените ВАШ-ПРОЕКТ-НА-RENDER на имя вашего сервиса из вкладки Render!
                 window.socket = io('https://onrender.com', { transports: ['websocket'] });
                 setupSocketListeners();
             }
@@ -77,9 +94,7 @@
             window.socket.on('canvas_state', (history) => {
                 if (history && Array.isArray(history)) {
                     linesMemory = history;
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    linesMemory.forEach(line => drawSegment(line));
+                    redrawCanvas();
                 }
             });
 
@@ -90,9 +105,14 @@
 
             window.socket.on('clear_canvas', () => {
                 linesMemory = [];
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                redrawCanvas();
             });
+        }
+
+        function redrawCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            linesMemory.forEach(line => drawSegment(line));
         }
 
         function drawSegment(data) {
@@ -104,6 +124,21 @@
             ctx.stroke();
             ctx.closePath();
         }
+        brushModeBtn.addEventListener('click', () => {
+            currentMode = 'brush';
+            brushModeBtn.classList.add('active');
+            eraserModeBtn.classList.remove('active');
+            colorGroup.style.opacity = '1';
+            colorGroup.style.pointerEvents = 'auto';
+        });
+
+        eraserModeBtn.addEventListener('click', () => {
+            currentMode = 'eraser';
+            eraserModeBtn.classList.add('active');
+            brushModeBtn.classList.remove('active');
+            colorGroup.style.opacity = '0.5'; 
+            colorGroup.style.pointerEvents = 'none';
+        });
 
         function getCoords(e) {
             if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -126,7 +161,7 @@
             const drawData = {
                 x0: lastX, y0: lastY,
                 x1: coords.x, y1: coords.y,
-                color: colorPicker.value,
+                color: currentMode === 'eraser' ? '#ffffff' : colorPicker.value,
                 size: lineWidthInput.value,
                 author: nickInput.value
             };
@@ -151,6 +186,7 @@
             const coords = getCoords(e);
             [lastX, lastY] = [coords.x, coords.y];
         });
+        
         canvas.addEventListener('touchmove', (e) => {
             const coords = getCoords(e);
             if (!isDrawing) return;
@@ -158,7 +194,7 @@
             const drawData = {
                 x0: lastX, y0: lastY,
                 x1: coords.x, y1: coords.y,
-                color: colorPicker.value,
+                color: currentMode === 'eraser' ? '#ffffff' : colorPicker.value,
                 size: lineWidthInput.value,
                 author: nickInput.value
             };
@@ -167,6 +203,7 @@
             if (window.socket) window.socket.emit('draw_line', drawData);
             [lastX, lastY] = [coords.x, coords.y];
         });
+        
         canvas.addEventListener('touchend', () => {
             if (isDrawing) {
                 isDrawing = false;
@@ -194,7 +231,22 @@
             }
         }
 
-        clearBtn.addEventListener('click', () => { if (window.socket) window.socket.emit('clear_canvas'); });
+        clearLocalBtn.addEventListener('click', () => {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        });
+
+        clearBtn.addEventListener('click', () => { 
+            if (confirm('Внимание! Это удалит рисунок у всех пользователей и на сервере. Продолжить?')) {
+                if (window.socket) window.socket.emit('clear_canvas'); 
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            redrawCanvas();
+        });
     </script>
 </body>
 </html>
